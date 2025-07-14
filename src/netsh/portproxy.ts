@@ -22,6 +22,14 @@ export async function getPortProxyList() {
    * --------------- ----------  --------------- ----------
    * *               50022       172.23.67.210   50022
    * *               8001        172.23.67.210   8001
+   *
+   * ipv6 をリッスンする:         ipv6 に接続する:
+   * 
+   * Address         Port        Address         Port
+   * --------------- ----------  --------------- ----------
+   * *               8001        192.168.10.100  8001
+   *
+   *
    * ```
    */
   const result = await Command.create(command, args).execute();
@@ -39,25 +47,80 @@ export async function getPortProxyList() {
   const lines = output
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line !== "");
+    .filter((line) => line !== "")
+    .filter((line) => !line.startsWith("Address"))
+    .filter((line) => !line.startsWith("-"));
 
-  // 3行目以降がデータ
-  const dataLines = lines.slice(3);
-  const resultList = dataLines.map((line) => {
-    const parts = line.split(/\s+/);
-    const [addressFrom, portFrom, addressTo, portTo] = parts;
+  const resultList: PortProxyConfig[] = (() => {
 
-    return {
-      addressFrom,
-      addressTo,
-      portFrom: parseInt(portFrom, 10),
-      portTo: parseInt(portTo, 10),
-    } as PortProxyConfig;
-  });
+    const result: PortProxyConfig[] = [];
+
+    let type: PortProxyConfig["type"] | null = null;
+
+    lines.forEach((line) => {
+      if (line === "") {
+        return;
+      }
+
+      if (line.includes("ipv")) {
+        const matches = line.match(/^.*ip(?<from>v\d).*ip(?<to>v\d).*$/);
+        if (matches === null) {
+          return;
+        }
+
+        const { from, to } = matches.groups!;
+        type = [from, to].join("to") as PortProxyConfig["type"];
+
+        return;
+      }
+
+      const parts = line.split(/\s+/);
+      const [addressFrom, portFrom, addressTo, portTo] = parts;
+      result.push({
+        type: type!,
+        addressFrom,
+        addressTo,
+        portFrom: parseInt(portFrom, 10),
+        portTo: parseInt(portTo, 10),
+      });
+    })
+
+    return result;
+
+  })();
 
   return resultList as PortProxyConfig[];
+}
 
-  // TODO: parse rows to PortProxyConfig[]
+type AddPortProxyOptions = {
+  connectPort?: number | null;
+  listenPort?: number | null;
+  listenAddress?: string | null;
+}
+
+export async function addPortProxy(
+  group: PortProxyConfig["type"],
+  listenPort: number,
+  connectAddress: string,
+  option: AddPortProxyOptions = {},
+) {
+  const { connectPort = null, listenAddress = null, } = option;
+
+  const command = "netsh";
+  const args = [
+    "interface",
+    "portproxy",
+    "add",
+    group,
+    `listenport=${listenPort}`,
+    `connectaddress=${connectAddress}`,
+    ...(connectPort !== null ? [`connectport=${connectPort}`] : []),
+    ...(listenAddress !== null ? [`listenaddress=${listenAddress}`] : []),
+    "protocol=tcp",
+  ];
+
+  const result = await Command.create(command, args).execute();
+  console.log("addPortProxy", result);
 }
 
 export type PortProxyContextType = {

@@ -7,7 +7,7 @@ function App() {
   const [portProxyList, setPortProxyList] = useState<PortProxyConfig[]>([]);
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
       <div className="flex all-center justify-center">
         <button
           type="button"
@@ -18,12 +18,34 @@ function App() {
             setPortProxyList(data);
           }}
         >
-          Click ot get Port Proxy List
+          Click to reload PortProxy List
         </button>
       </div>
-      <pre>
-        <code>{JSON.stringify(portProxyList, null, 2)}</code>
-      </pre>
+
+      <div className="overflow-x-auto border border-base-content/5 bg-base-100">
+        <table className="table table-pin-rows">
+          <thead>
+            <tr>
+              <th>Group</th>
+              <th>Address from</th>
+              <th>Port from</th>
+              <th>Address to</th>
+              <th>Port to</th>
+            </tr>
+          </thead>
+          <tbody>
+            {portProxyList.map((item) => (
+              <tr key={Object.values(item).join("-")}>
+                <td>{item.type}</td>
+                <td>{item.addressFrom}</td>
+                <td>{item.portFrom}</td>
+                <td>{item.addressTo}</td>
+                <td>{item.portTo}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>{" "}
+      </div>
     </div>
   );
 }
