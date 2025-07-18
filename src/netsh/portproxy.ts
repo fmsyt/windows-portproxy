@@ -102,7 +102,7 @@ export async function addPortProxy(
   connectAddress: string,
   option: AddPortProxyOptions = {},
 ) {
-  const { connectPort = null, listenAddress = null, } = option;
+  const { connectPort = listenPort, listenAddress = "*", } = option;
 
   const args = [
     "interface",
@@ -111,10 +111,11 @@ export async function addPortProxy(
     group,
     `listenport=${listenPort}`,
     `connectaddress=${connectAddress}`,
-    ...(connectPort ? [`connectport=${connectPort}`] : []),
-    ...(listenAddress ? [`listenaddress=${listenAddress}`] : []),
+    `connectport=${connectPort}`,
+    `listenaddress=${listenAddress}`,
   ];
 
+  console.log("Adding port proxy with args:", args);
 
   const command = Command.create("netsh-add", args);
   const result = await command.execute();
@@ -135,6 +136,8 @@ export async function deletePortProxy(
     `listenport=${listenPort}`,
     ...(listenAddress ? [`listenaddress=${listenAddress}`] : []),
   ];
+
+  console.log("Deleting port proxy with args:", args);
 
   const command = Command.create("netsh-delete", args);
   const result = await command.execute();

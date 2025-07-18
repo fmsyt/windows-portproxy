@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
-import { addPortProxy, getPortProxyList } from "./netsh/portproxy";
+import { useCallback, useLayoutEffect, useMemo, useState } from "react";
+import { addPortProxy, deletePortProxy, getPortProxyList } from "./netsh/portproxy";
 import "./App.css";
 import type { PortProxyConfig } from "./netsh/types";
-import { Add as AddIcon, Close as CloseIcon } from "@mui/icons-material";
+import AddIcon from "@mui/icons-material/Add";
+import CloseIcon from "@mui/icons-material/Close";
+import DeleteIcon from "@mui/icons-material/Delete";
 
 type AddPortProxyState = {
   [key in keyof PortProxyConfig]?: {
@@ -16,6 +18,14 @@ const defaultAddPortProxyState: AddPortProxyState = {
 }
 
 function App() {
+
+  const reload = useCallback(async () => {
+    const data = await getPortProxyList();
+    setPortProxyList(data);
+  }, [])
+
+  useLayoutEffect(() => { reload() }, []);
+
   const [portProxyList, setPortProxyList] = useState<PortProxyConfig[]>([]);
 
   const [addingField, setAddingField] = useState<AddPortProxyState | null>(null);
@@ -49,20 +59,9 @@ function App() {
 
   }, [addingField]);
 
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex all-center justify-center">
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={async () => {
-            const data = await getPortProxyList();
-            setPortProxyList(data);
-          }}
-        >
-          Click to reload PortProxy List
-        </button>
-      </div>
 
       <div className="overflow-x-auto border border-base-content/5 bg-base-100">
         <table className="table table-pin-rows">
@@ -84,7 +83,18 @@ function App() {
                 <td>{item.listenPort}</td>
                 <td>{item.connectAddress}</td>
                 <td>{item.connectPort}</td>
-                <td></td>
+                <td>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await deletePortProxy(item.type, item.listenPort, item.listenAddress);
+                      reload();
+                    }}
+                  >
+                    <DeleteIcon />
+                  </button>
+                </td>
               </tr>
             ))}
 
@@ -155,9 +165,7 @@ function App() {
                     type="button"
                     className="btn btn-primary btn-xs"
                     disabled={!addingField || !isValid}
-                    onClick={(e) => {
-                      console.log("Address to clicked", e);
-
+                    onClick={() => {
                       if (!addingField) {
                         return;
                       }
@@ -173,6 +181,7 @@ function App() {
 
                       const { type, listenPort: portFrom, connectAddress: addressTo, ...others } = pairs;
                       addPortProxy(type, portFrom, addressTo, others)
+                      reload();
                     }}
                   >
                     追加
