@@ -15,11 +15,58 @@
         {
           "name": "netsh",
           "cmd": "netsh.exe",
+          "args": true
+        },
+        {
+          "name": "netsh-show",
+          "cmd": "netsh.exe",
           "args": [
             "interface",
             "portproxy",
             "show",
             "all"
+          ]
+        },
+        {
+          "name": "netsh-add",
+          "cmd": "netsh.exe",
+          "args": [
+            "interface",
+            "portproxy",
+            "add",
+            {
+              "validator": "v(4|6)tov(4|6)"
+            },
+            {
+              "validator": "(listenport=)?(\\d{1,5}|\\w+)"
+            },
+            {
+              "validator": "(connectaddress=)?\\S+"
+            },
+            {
+              "validator": "((connectport=)?(\\d{1,5}|\\w+))?"
+            },
+            {
+              "validator": "((listenaddress=)?\\S+)?"
+            }
+          ]
+        },
+        {
+          "name": "netsh-delete",
+          "cmd": "netsh.exe",
+          "args": [
+            "interface",
+            "portproxy",
+            "delete",
+            {
+              "validator": "v(4|6)tov(4|6)"
+            },
+            {
+              "validator": "(listenport=)?(\\d{1,5}|\\w+)"
+            },
+            {
+              "validator": "((listenaddress=)?\\S+)?"
+            }
           ]
         }
       ]

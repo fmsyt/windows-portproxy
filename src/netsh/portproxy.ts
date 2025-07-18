@@ -3,8 +3,6 @@ import { createContext } from "react";
 import type { PortProxyConfig } from "./types";
 
 export async function getPortProxyList() {
-  const command = "netsh";
-  const args = ["interface", "portproxy", "show", "all"];
 
   /**
    * 設定がないときの出力
@@ -32,7 +30,7 @@ export async function getPortProxyList() {
    *
    * ```
    */
-  const result = await Command.create(command, args).execute();
+  const result = await Command.create("netsh-show").execute();
   if (result.code !== 0) {
     throw new Error(
       `Command failed with code ${result.code}: ${result.stdout}`,
@@ -78,10 +76,10 @@ export async function getPortProxyList() {
       const [addressFrom, portFrom, addressTo, portTo] = parts;
       result.push({
         type: type!,
-        addressFrom,
-        addressTo,
-        portFrom: parseInt(portFrom, 10),
-        portTo: parseInt(portTo, 10),
+        listenAddress: addressFrom,
+        connectAddress: addressTo,
+        listenPort: parseInt(portFrom, 10),
+        connectPort: parseInt(portTo, 10),
       });
     })
 
@@ -106,7 +104,6 @@ export async function addPortProxy(
 ) {
   const { connectPort = null, listenAddress = null, } = option;
 
-  const command = "netsh";
   const args = [
     "interface",
     "portproxy",
@@ -114,13 +111,35 @@ export async function addPortProxy(
     group,
     `listenport=${listenPort}`,
     `connectaddress=${connectAddress}`,
-    ...(connectPort !== null ? [`connectport=${connectPort}`] : []),
-    ...(listenAddress !== null ? [`listenaddress=${listenAddress}`] : []),
-    "protocol=tcp",
+    ...(connectPort ? [`connectport=${connectPort}`] : []),
+    ...(listenAddress ? [`listenaddress=${listenAddress}`] : []),
   ];
 
-  const result = await Command.create(command, args).execute();
-  console.log("addPortProxy", result);
+
+  const command = Command.create("netsh-add", args);
+  const result = await command.execute();
+
+  return result;
+}
+
+export async function deletePortProxy(
+  group: PortProxyConfig["type"],
+  listenPort: number,
+  listenAddress?: string | null,
+) {
+  const args = [
+    "interface",
+    "portproxy",
+    "delete",
+    group,
+    `listenport=${listenPort}`,
+    ...(listenAddress ? [`listenaddress=${listenAddress}`] : []),
+  ];
+
+  const command = Command.create("netsh-delete", args);
+  const result = await command.execute();
+
+  return result;
 }
 
 export type PortProxyContextType = {
