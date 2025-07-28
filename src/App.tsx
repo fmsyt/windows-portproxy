@@ -1,36 +1,55 @@
-import { useCallback, useLayoutEffect, useMemo, useState } from "react";
-import { addPortProxy, deletePortProxy, getPortProxyList } from "./netsh/portproxy";
-import "./App.css";
-import type { PortProxyConfig } from "./netsh/types";
 import AddIcon from "@mui/icons-material/Add";
+import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteIcon from "@mui/icons-material/Delete";
+import {
+  Suspense,
+  use,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
+import "./App.css";
+import { getElevatedState } from "./ipc";
+import {
+  addPortProxy,
+  deletePortProxy,
+  getPortProxyList,
+} from "./netsh/portproxy";
+import type { PortProxyConfig } from "./netsh/types";
 
 type AddPortProxyState = {
   [key in keyof PortProxyConfig]?: {
     value: PortProxyConfig[key];
     invalidMessage?: string | null;
-  }
-}
+  };
+};
 
 const defaultAddPortProxyState: AddPortProxyState = {
   type: { value: "v4tov4" },
-}
+};
 
 function App() {
+  const isElevatedPromise = useMemo(() => getElevatedState(), []);
 
   const reload = useCallback(async () => {
     const data = await getPortProxyList();
     setPortProxyList(data);
-  }, [])
+  }, []);
 
-  useLayoutEffect(() => { reload() }, []);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 初回表示のみ実行する
+  useLayoutEffect(() => {
+    reload();
+  }, []);
 
   const [portProxyList, setPortProxyList] = useState<PortProxyConfig[]>([]);
 
-  const [addingField, setAddingField] = useState<AddPortProxyState | null>(null);
+  const [addingField, setAddingField] = useState<AddPortProxyState | null>(
+    null,
+  );
   const isValid = useMemo(() => {
-
     if (!addingField) {
       return true;
     }
@@ -38,7 +57,6 @@ function App() {
     let valid = true;
 
     Object.entries(addingField).forEach(([key, field]) => {
-
       const value = field?.value;
 
       switch (key) {
@@ -53,18 +71,19 @@ function App() {
         default:
           break;
       }
-    })
+    });
 
     return valid;
-
   }, [addingField]);
-
 
   return (
     <div className="flex flex-col gap-4">
+      <Suspense fallback={<div className="alert alert-info">Loading...</div>}>
+        <Message promise={isElevatedPromise} />
+      </Suspense>
 
-      <div className="overflow-x-auto border border-base-content/5 bg-base-100">
-        <table className="table table-pin-rows">
+      <div className="overflow-x-auto border border-base-content/5 bg-base-100 max-h-[100svh]">
+        <table className="table table-pin-rows table-pin-cols">
           <thead>
             <tr>
               <th>Group</th>
@@ -83,18 +102,42 @@ function App() {
                 <td>{item.listenPort}</td>
                 <td>{item.connectAddress}</td>
                 <td>{item.connectPort}</td>
-                <td>
+                <th>
+                  <div className="inline-flex items-center gap-1">
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs"
+                      disabled={Boolean(addingField)}
+                      onClick={async () => {
+                        const { type, listenAddress, connectAddress } = item;
 
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await deletePortProxy(item.type, item.listenPort, item.listenAddress);
-                      reload();
-                    }}
-                  >
-                    <DeleteIcon />
-                  </button>
-                </td>
+                        setAddingField({
+                          type: { value: type },
+                          listenAddress: { value: listenAddress },
+                          connectAddress: { value: connectAddress },
+                        });
+                      }}
+                    >
+                      <ContentCopyIcon fontSize="small" />
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-error btn-xs"
+                      disabled={Boolean(addingField)}
+                      onClick={async () => {
+                        await deletePortProxy(
+                          item.type,
+                          item.listenPort,
+                          item.listenAddress,
+                        );
+                        reload();
+                      }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </button>
+                  </div>
+                </th>
               </tr>
             ))}
 
@@ -104,10 +147,13 @@ function App() {
                   <select
                     className="select select-sm validator"
                     required
+                    defaultValue={addingField?.type?.value || "v4tov4"}
                     onChange={(e) => {
                       setAddingField((prev) => ({
                         ...prev,
-                        type: { value: e.target.value as PortProxyConfig["type"] },
+                        type: {
+                          value: e.target.value as PortProxyConfig["type"],
+                        },
                       }));
                     }}
                   >
@@ -122,19 +168,27 @@ function App() {
                     type="text"
                     pattern="^((\d{1,3}\.){3}\d{1,3}|\*)$"
                     className="input input-sm validator"
+                    defaultValue={addingField?.listenAddress?.value || ""}
                     onChange={(e) => {
-                      setAddingField((prev) => ({ ...prev, listenAddress: { value: e.target.value } }));
+                      setAddingField((prev) => ({
+                        ...prev,
+                        listenAddress: { value: e.target.value },
+                      }));
                     }}
                   />
                 </td>
                 <td>
                   <input
                     type="number"
+                    defaultValue={addingField?.listenPort?.value || ""}
                     className="input input-sm"
                     min="0"
                     max="65535"
                     onChange={(e) => {
-                      setAddingField((prev) => ({ ...prev, listenPort: { value: Number(e.target.value) } }));
+                      setAddingField((prev) => ({
+                        ...prev,
+                        listenPort: { value: Number(e.target.value) },
+                      }));
                     }}
                   />
                 </td>
@@ -142,9 +196,13 @@ function App() {
                   <input
                     type="text"
                     className="input input-sm validator"
+                    defaultValue={addingField?.connectAddress?.value || ""}
                     pattern="^(\d{1,3}\.){3}\d{1,3}$"
                     onChange={(e) => {
-                      setAddingField((prev) => ({ ...prev, connectAddress: { value: e.target.value } }));
+                      setAddingField((prev) => ({
+                        ...prev,
+                        connectAddress: { value: e.target.value },
+                      }));
                     }}
                   />
                 </td>
@@ -152,63 +210,106 @@ function App() {
                   <input
                     type="number"
                     className="input input-sm"
+                    defaultValue={addingField?.connectPort?.value || ""}
                     min="0"
                     max="65535"
                     placeholder={String(addingField?.listenPort?.value || "")}
                     onChange={(e) => {
-                      setAddingField((prev) => ({ ...prev, connectPort: { value: Number(e.target.value) } }));
+                      setAddingField((prev) => ({
+                        ...prev,
+                        connectPort: { value: Number(e.target.value) },
+                      }));
                     }}
                   />
                 </td>
-                <td>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-xs"
-                    disabled={!addingField || !isValid}
-                    onClick={() => {
-                      if (!addingField) {
-                        return;
-                      }
+                <th>
+                  <div className="inline-flex items-center gap-1">
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-xs"
+                      disabled={!addingField || !isValid}
+                      onClick={() => {
+                        if (!addingField) {
+                          return;
+                        }
 
-                      type Pairs = {
-                        [key in keyof PortProxyConfig]: PortProxyConfig[key];
-                      }
+                        type Pairs = {
+                          [key in keyof PortProxyConfig]: PortProxyConfig[key];
+                        };
 
-                      const pairs = Object.entries(addingField).reduce((acc, [key, value]) => {
-                        acc[key as keyof PortProxyConfig] = value.value;
-                        return acc;
-                      }, {} as Pairs)
+                        const pairs = Object.entries(addingField).reduce(
+                          (acc, [key, field]) => {
+                            // @ts-ignore
+                            acc[key as keyof PortProxyConfig] = field.value;
+                            return acc;
+                          },
+                          {} as Pairs,
+                        );
 
-                      const { type, listenPort: portFrom, connectAddress: addressTo, ...others } = pairs;
-                      addPortProxy(type, portFrom, addressTo, others)
-                      reload();
-                    }}
-                  >
-                    追加
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-xs"
-                    onClick={() => { setAddingField(null); }}
-                  >
-                    <CloseIcon fontSize="small" />
-                    キャンセル
-                  </button>
-                </td>
+                        const {
+                          type,
+                          listenPort: portFrom,
+                          connectAddress: addressTo,
+                          ...others
+                        } = pairs;
+                        addPortProxy(type, portFrom, addressTo, others);
+                        reload();
+                      }}
+                    >
+                      <CheckIcon fontSize="small" />
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs"
+                      onClick={() => {
+                        setAddingField(null);
+                      }}
+                    >
+                      <CloseIcon fontSize="small" />
+                    </button>
+                  </div>
+                </th>
               </tr>
             )}
+
+            <tr>
+              <td colSpan={5} className="text-center"></td>
+
+              <th>
+                <button
+                  type="button"
+                  className="btn bbtn-primary btn-xs"
+                  disabled={Boolean(addingField)}
+                  onClick={() => {
+                    setAddingField(defaultAddPortProxyState);
+                  }}
+                >
+                  <AddIcon fontSize="small" />
+                  追加
+                </button>
+              </th>
+            </tr>
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
 
-      <button
-        className="btn"
-        disabled={Boolean(addingField)}
-        onClick={() => { setAddingField(defaultAddPortProxyState); }}
-      >
-        <AddIcon />
-        追加
-      </button>
+type MessageProps = {
+  promise: ReturnType<typeof getElevatedState>;
+};
+
+function Message({ promise }: MessageProps) {
+  const elevated = use(promise);
+  if (elevated) {
+    return null;
+  }
+
+  return (
+    <div className="alert alert-warning">
+      管理者権限で実行されていません。
+      <br />
     </div>
   );
 }

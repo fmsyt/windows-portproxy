@@ -3,7 +3,6 @@ import { createContext } from "react";
 import type { PortProxyConfig } from "./types";
 
 export async function getPortProxyList() {
-
   /**
    * 設定がないときの出力
    *
@@ -22,7 +21,7 @@ export async function getPortProxyList() {
    * *               8001        172.23.67.210   8001
    *
    * ipv6 をリッスンする:         ipv6 に接続する:
-   * 
+   *
    * Address         Port        Address         Port
    * --------------- ----------  --------------- ----------
    * *               8001        192.168.10.100  8001
@@ -50,7 +49,6 @@ export async function getPortProxyList() {
     .filter((line) => !line.startsWith("-"));
 
   const resultList: PortProxyConfig[] = (() => {
-
     const result: PortProxyConfig[] = [];
 
     let type: PortProxyConfig["type"] | null = null;
@@ -62,11 +60,11 @@ export async function getPortProxyList() {
 
       if (line.includes("ipv")) {
         const matches = line.match(/^.*ip(?<from>v\d).*ip(?<to>v\d).*$/);
-        if (matches === null) {
+        if (matches?.groups === null || matches?.groups === undefined) {
           return;
         }
 
-        const { from, to } = matches.groups!;
+        const { from, to } = matches.groups;
         type = [from, to].join("to") as PortProxyConfig["type"];
 
         return;
@@ -75,16 +73,15 @@ export async function getPortProxyList() {
       const parts = line.split(/\s+/);
       const [addressFrom, portFrom, addressTo, portTo] = parts;
       result.push({
-        type: type!,
+        type: type as PortProxyConfig["type"],
         listenAddress: addressFrom,
         connectAddress: addressTo,
         listenPort: parseInt(portFrom, 10),
         connectPort: parseInt(portTo, 10),
       });
-    })
+    });
 
     return result;
-
   })();
 
   return resultList as PortProxyConfig[];
@@ -94,7 +91,7 @@ type AddPortProxyOptions = {
   connectPort?: number | null;
   listenPort?: number | null;
   listenAddress?: string | null;
-}
+};
 
 export async function addPortProxy(
   group: PortProxyConfig["type"],
@@ -102,7 +99,7 @@ export async function addPortProxy(
   connectAddress: string,
   option: AddPortProxyOptions = {},
 ) {
-  const { connectPort = listenPort, listenAddress = "*", } = option;
+  const { connectPort = listenPort, listenAddress = "*" } = option;
 
   const args = [
     "interface",
