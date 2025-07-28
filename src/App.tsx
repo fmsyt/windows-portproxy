@@ -9,6 +9,7 @@ import {
   useCallback,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import "./App.css";
@@ -49,6 +50,62 @@ function App() {
   const [addingField, setAddingField] = useState<AddPortProxyState | null>(
     null,
   );
+
+  const [deleteDialogContent, setDeleteDialogContent] =
+    useState<PortProxyConfig | null>(null);
+  const deleteDialogRef = useRef<HTMLDialogElement | null>(null);
+  const handleOpenDeleteDialog = useCallback((config: PortProxyConfig) => {
+    if (!deleteDialogRef.current) {
+      return;
+    }
+
+    setDeleteDialogContent(config);
+    deleteDialogRef.current.showModal();
+  }, []);
+
+  const handleDeleteConfig = useCallback(async () => {
+    if (!deleteDialogContent || !deleteDialogRef.current) {
+      return;
+    }
+
+    await deletePortProxy(
+      deleteDialogContent.type,
+      deleteDialogContent.listenPort,
+      deleteDialogContent.listenAddress,
+    );
+
+    reload();
+  }, [deleteDialogContent, reload]);
+
+  const handleAddConfig = useCallback(
+    async (addingField: AddPortProxyState | null) => {
+      if (!addingField) {
+        return;
+      }
+
+      type Pairs = {
+        [key in keyof PortProxyConfig]: PortProxyConfig[key];
+      };
+
+      const pairs = Object.entries(addingField).reduce((acc, [key, field]) => {
+        // @ts-ignore
+        acc[key as keyof PortProxyConfig] = field.value;
+        return acc;
+      }, {} as Pairs);
+
+      const {
+        type,
+        listenPort: portFrom,
+        connectAddress: addressTo,
+        ...others
+      } = pairs;
+
+      addPortProxy(type, portFrom, addressTo, others);
+      reload();
+    },
+    [reload],
+  );
+
   const isValid = useMemo(() => {
     if (!addingField) {
       return true;
@@ -78,7 +135,7 @@ function App() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Suspense fallback={<div className="alert alert-info">Loading...</div>}>
+      <Suspense>
         <Message promise={isElevatedPromise} />
       </Suspense>
 
@@ -125,13 +182,8 @@ function App() {
                       type="button"
                       className="btn btn-error btn-xs"
                       disabled={Boolean(addingField)}
-                      onClick={async () => {
-                        await deletePortProxy(
-                          item.type,
-                          item.listenPort,
-                          item.listenAddress,
-                        );
-                        reload();
+                      onClick={() => {
+                        handleOpenDeleteDialog(item);
                       }}
                     >
                       <DeleteIcon fontSize="small" />
@@ -229,31 +281,7 @@ function App() {
                       className="btn btn-primary btn-xs"
                       disabled={!addingField || !isValid}
                       onClick={() => {
-                        if (!addingField) {
-                          return;
-                        }
-
-                        type Pairs = {
-                          [key in keyof PortProxyConfig]: PortProxyConfig[key];
-                        };
-
-                        const pairs = Object.entries(addingField).reduce(
-                          (acc, [key, field]) => {
-                            // @ts-ignore
-                            acc[key as keyof PortProxyConfig] = field.value;
-                            return acc;
-                          },
-                          {} as Pairs,
-                        );
-
-                        const {
-                          type,
-                          listenPort: portFrom,
-                          connectAddress: addressTo,
-                          ...others
-                        } = pairs;
-                        addPortProxy(type, portFrom, addressTo, others);
-                        reload();
+                        handleAddConfig(addingField);
                       }}
                     >
                       <CheckIcon fontSize="small" />
@@ -292,6 +320,65 @@ function App() {
           </tbody>
         </table>
       </div>
+
+      <dialog ref={deleteDialogRef} className="modal">
+        <div className="modal-box">
+          <h3 className="font-bold text-lg">
+            選択されたPortProxyを削除しますか？
+          </h3>
+          <p className="py-4">
+            <table className="table">
+              <tbody>
+                <tr>
+                  <th>Group</th>
+                  <td>{deleteDialogContent?.type}</td>
+                </tr>
+                <tr>
+                  <th>Address from</th>
+                  <td>{deleteDialogContent?.listenAddress}</td>
+                </tr>
+                <tr>
+                  <th>Port from</th>
+                  <td>{deleteDialogContent?.listenPort}</td>
+                </tr>
+                <tr>
+                  <th>Address to</th>
+                  <td>{deleteDialogContent?.connectAddress}</td>
+                </tr>
+                <tr>
+                  <th>Port to</th>
+                  <td>{deleteDialogContent?.connectPort}</td>
+                </tr>
+              </tbody>
+            </table>
+          </p>
+
+          <div className="modal-action">
+            <form method="dialog">
+              <button
+                type="button"
+                className="btn btn-error"
+                disabled={!deleteDialogContent}
+                onClick={async () => {
+                  await handleDeleteConfig();
+
+                  if (deleteDialogRef.current) {
+                    deleteDialogRef.current.close();
+                  }
+                }}
+              >
+                削除
+              </button>
+              <button type="submit" className="btn">
+                キャンセル
+              </button>
+            </form>
+          </div>
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button type="submit">close</button>
+        </form>
+      </dialog>
     </div>
   );
 }
